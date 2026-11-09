@@ -31,7 +31,7 @@ export async function withTimeout<T>(
 }
 
 function isValidTimeout(timeout: number): boolean {
-  return isFinite(timeout) && timeout >= 0;
+  return isFinite(timeout) && timeout >= 0 && Number.isInteger(timeout);
 }
 
 export class TimeoutError extends Error {
