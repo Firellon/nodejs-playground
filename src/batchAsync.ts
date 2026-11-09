@@ -21,17 +21,18 @@ export async function* batchAsync<T>(
     var batch = [] as T[];
     var currentBatchSize = 0;
     for await (var item of source) {
+        batch.push(item);
+        currentBatchSize++;
+
         if (currentBatchSize >= batchSize) {
             yield batch;
             batch = [];
             currentBatchSize = 0;
-        }
-
-        batch.push(item);
-        currentBatchSize++;
+        }        
     }
-    
-    yield batch;
+    if (currentBatchSize > 0) {
+        yield batch;
+    }
 }
 
 function IsValidBatchSize(batchSize: number): boolean {
