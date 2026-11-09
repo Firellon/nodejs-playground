@@ -20,6 +20,7 @@ export async function* batchAsync<T>(
 
     var batch = [] as T[];
     var currentBatchSize = 0;
+
     for await (var item of source) {
         batch.push(item);
         currentBatchSize++;
@@ -28,8 +29,9 @@ export async function* batchAsync<T>(
             yield batch;
             batch = [];
             currentBatchSize = 0;
-        }        
+        }
     }
+    
     if (currentBatchSize > 0) {
         yield batch;
     }

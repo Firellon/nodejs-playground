@@ -7,6 +7,12 @@ async function* numbers(max: number = 0) {
     }
 }
 
+async function* faultySource() {
+  yield 1;
+  yield 2;
+  throw new Error("Source failed");
+}
+
 async function executeBatchAsync<T>(
     source: AsyncIterable<T>,
     batchSize: number,
@@ -51,6 +57,15 @@ describe('batchAsync', () => {
         await expect(executeBatchAsync(numbers(), NaN, (batch) => result.push(batch)))
         .rejects.toThrow(
             new RangeError(`Invalid batch size NaN!`)
+        )
+    });
+
+    it('throws on generator throws', async () => {
+        var result = [] as number[][];
+
+        await expect(executeBatchAsync(faultySource(), 3, (batch) => result.push(batch)))
+        .rejects.toThrow(
+            new Error(`Source failed`)
         )
     });
 

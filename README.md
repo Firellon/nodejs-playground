@@ -33,13 +33,3 @@ tests/
   mapConcurrent.test.ts    # Add later
   parseUser.test.ts       # Add later
 ```
-
-## Today's challenge: withTimeout
-
-The current implementation is copied from the 2026-11-03 solution, with only an optional `undefined` timer type added to satisfy strict typing and test code moved out. `isValidTimeout` intentionally retains the non-integer bug.
-
-Complete the TODO test cases yourself. Test outcomes using `expect(...).resolves` and `expect(...).rejects`, not `console.log`. For deterministic timing tests, investigate Vitest's `vi.useFakeTimers()` and `vi.advanceTimersByTimeAsync()`; restore real timers after each test.
-
-Important: cooperative cancellation does **not** stop a signal-ignoring operation; it only lets `withTimeout` reject while the underlying work may continue.
-
-When done, add your implementation notes to this README or a dated Markdown session log and commit the files to Git.
