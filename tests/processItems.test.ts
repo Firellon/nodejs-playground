@@ -98,7 +98,7 @@ describe('processItems', () => {
         expect(result).toEqual(numbers(8));
     });
 
-     it('stops processing a batch if it throws', async () => {
+    it('stops processing a batch if it throws', async () => {
         var result = [] as number[];
 
         await expect(processItems(numbers(8), (item) => {
@@ -111,4 +111,16 @@ describe('processItems', () => {
 
         expect(result).toEqual(numbers(5));
     });
+
+    it('waits for a timer to execute in the middle of processing', async () => {
+        var result = [] as number[];
+
+        await processItems(numbers(1000), (item) => {
+            if (item == 0) setTimeout(() => result.push(-10), 0);
+            result.push(item);
+        }, 10);
+
+        expect(result.length).toBeGreaterThan(1000); // 1001 or 1002?
+        expect(result).toContain(-10);
+    })
 });
