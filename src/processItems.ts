@@ -11,12 +11,12 @@ export async function processItems<T>(
 
     var currentBatchSize = 0;
     for (var item of items) {
-        processItem(item);
-        currentBatchSize++;
         if (currentBatchSize >= batchSize) {
             await setImmediate();
             currentBatchSize = 0;
         }
+        processItem(item);
+        currentBatchSize++;
     }
 }
 
