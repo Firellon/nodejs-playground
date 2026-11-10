@@ -10,7 +10,15 @@ import { processItems } from '../src/processItems';
 - Handle 100,000 items without recursive stack growth.
 Important: Using await Promise.resolve() or queueMicrotask() is insufficient for yielding to the event loop. You need a mechanism that allows Node.js to reach another event loop phase.
  */
+function numbers(max: number): number[] {
+    var result = [];
 
+    for (var i = 0; i <= max; i++) {
+        result.push(i);
+    }
+
+    return result;
+}
 
 describe('processItems', () => {
     it('rejects negative batch size', async () => {
@@ -77,16 +85,30 @@ describe('processItems', () => {
     it('processes a batch of items smaller than batchSize', async () => {
         var result = [] as number[];
 
-        await processItems([1, 2, 3], (item) => result.push(item), 5);
+        await processItems(numbers(3), (item) => result.push(item), 5);
 
-        expect(result).toEqual([1, 2, 3]);
+        expect(result).toEqual(numbers(3));
     });
 
     it('processes a batch of items bigger than batchSize', async () => {
         var result = [] as number[];
 
-        await processItems([1, 2, 3, 4, 5, 6, 7, 8], (item) => result.push(item), 5);
+        await processItems(numbers(8), (item) => result.push(item), 5);
 
-        expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+        expect(result).toEqual(numbers(8));
+    });
+
+     it('stops processing a batch if it throws', async () => {
+        var result = [] as number[];
+
+        await expect(processItems(numbers(8), (item) => {
+            if (item == 6) throw new Error("Item processing broke down!")
+            result.push(item);
+        }, 5))
+            .rejects.toThrow(
+                new Error("Item processing broke down!")
+            )
+
+        expect(result).toEqual(numbers(5));
     });
 });
