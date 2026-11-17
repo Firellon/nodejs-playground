@@ -141,22 +141,21 @@ describe('batchAsync', () => {
     it('lazily consumes source values', async () => {
         var producedNumbersCount = 0;
         async function* trackedNumbers(max: number) {
-            producedNumbersCount = 0;
             for (let i = 1; i <= max; i++) {
                 producedNumbersCount++;
                 yield i;
             }
         }
 
-        var result = [] as number[][];
-
         const iterator = batchAsync(trackedNumbers(100), 3);
         expect(producedNumbersCount).toEqual(0);
         
         const first = await iterator.next();
+        expect(first.value).toEqual([1, 2, 3]);
         expect(producedNumbersCount).toEqual(3);
 
         const second = await iterator.next();
+        expect(second.value).toEqual([4, 5, 6]);
         expect(producedNumbersCount).toEqual(6);
     });
 
