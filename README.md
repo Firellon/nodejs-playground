@@ -1,4 +1,4 @@
-# Backend Interview Preparation
+# Node.js Playground
 
 Persistent TypeScript / Node.js practice repository. Store each challenge under `src/` and its tests under `tests/`.
 
