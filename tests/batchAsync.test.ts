@@ -23,6 +23,25 @@ async function executeBatchAsync<T>(
     }
 }
 
+async function executeBatchAsyncPartially<T>(
+    source: AsyncIterable<T>,
+    batchSize: number,
+    batchProcessor: (batch: T[]) => void,
+    batchCount: number
+) {
+    if (batchCount <= 0) return;
+
+    var currentBatch = 0;
+    for await (const batch of batchAsync(source, batchSize)) {        
+        batchProcessor(batch);
+        currentBatch++;
+
+        if (currentBatch >= batchCount) {
+            return;
+        }
+    }
+}
+
 describe('batchAsync', () => {
     it('rejects negative batch size', async () => {
         var result = [] as number[][];
@@ -109,5 +128,48 @@ describe('batchAsync', () => {
 
         expect(result.length).toEqual(1);
         expect(result[0]).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('lazily consumes source values', async () => {
+        var producedNumbersCount = 0;
+        async function* trackedNumbers(max: number) {
+            for (let i = 1; i <= max; i++) {
+                producedNumbersCount++;
+                yield i;
+            }
+        }
+
+        const iterator = batchAsync(trackedNumbers(100), 3);
+        expect(producedNumbersCount).toEqual(0);
+        
+        const first = await iterator.next();
+        expect(first.value).toEqual([1, 2, 3]);
+        expect(producedNumbersCount).toEqual(3);
+
+        const second = await iterator.next();
+        expect(second.value).toEqual([4, 5, 6]);
+        expect(producedNumbersCount).toEqual(6);
+    });
+
+    it('cleans resources up quickly', async () => {
+        var producedNumbersCount = 0;
+        async function* sourceFinally(max: number = 0, callback: () => void) {
+            try {
+                for (let i = 0; i < max; i++) {
+                    producedNumbersCount++;
+                    yield i;
+                }
+            } finally {
+                callback();
+            }
+        }
+
+        var producedAtCleanup: number[] = [];
+        var source = sourceFinally(100, () => {
+            producedAtCleanup.push(producedNumbersCount);
+        });
+        await executeBatchAsyncPartially(source, 5, () => {}, 2);
+
+        expect(producedAtCleanup).toEqual([10]);
     });
 });
