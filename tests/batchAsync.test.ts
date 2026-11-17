@@ -13,16 +13,6 @@ async function* faultySource() {
   throw new Error("Source failed");
 }
 
-async function* sourceFinally(max: number = 0, callback: () => void) {
-    try {
-        for (let i = 0; i < max; i++) {
-            yield i;
-        }
-    } finally {
-        callback();
-    }
-}
-
 async function executeBatchAsync<T>(
     source: AsyncIterable<T>,
     batchSize: number,
@@ -39,6 +29,8 @@ async function executeBatchAsyncPartially<T>(
     batchProcessor: (batch: T[]) => void,
     batchCount: number
 ) {
+    if (batchCount <= 0) return;
+
     var currentBatch = 0;
     for await (const batch of batchAsync(source, batchSize)) {        
         batchProcessor(batch);
@@ -160,16 +152,24 @@ describe('batchAsync', () => {
     });
 
     it('cleans resources up quickly', async () => {
-        var result = [] as number[][];
-        var callbackCount = 0;
-        await executeBatchAsyncPartially(sourceFinally(100, () => callbackCount++), 3, (batch) => {
-            result.push(batch)
-        }, 1);
-        expect(callbackCount).toEqual(1);
+        var producedNumbersCount = 0;
+        async function* sourceFinally(max: number = 0, callback: () => void) {
+            try {
+                for (let i = 0; i < max; i++) {
+                    producedNumbersCount++;
+                    yield i;
+                }
+            } finally {
+                callback();
+            }
+        }
 
-        await executeBatchAsyncPartially(sourceFinally(100, () => callbackCount++), 3, (batch) => {
-            result.push(batch)
-        }, 2);
-        expect(callbackCount).toEqual(2);
+        var producedAtCleanup: number[] = [];
+        var source = sourceFinally(100, () => {
+            producedAtCleanup.push(producedNumbersCount);
+        });
+        await executeBatchAsyncPartially(source, 5, () => {}, 2);
+
+        expect(producedAtCleanup).toEqual([10]);
     });
 });
