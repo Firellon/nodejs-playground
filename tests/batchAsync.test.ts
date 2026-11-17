@@ -13,6 +13,16 @@ async function* faultySource() {
   throw new Error("Source failed");
 }
 
+async function* sourceFinally(max: number = 0, callback: () => void) {
+    try {
+        for (let i = 0; i < max; i++) {
+            yield i;
+        }
+    } finally {
+        callback();
+    }
+}
+
 async function executeBatchAsync<T>(
     source: AsyncIterable<T>,
     batchSize: number,
@@ -20,6 +30,23 @@ async function executeBatchAsync<T>(
 ) {
     for await (const batch of batchAsync(source, batchSize)) {
         batchProcessor(batch);
+    }
+}
+
+async function executeBatchAsyncPartially<T>(
+    source: AsyncIterable<T>,
+    batchSize: number,
+    batchProcessor: (batch: T[]) => void,
+    batchCount: number
+) {
+    var currentBatch = 0;
+    for await (const batch of batchAsync(source, batchSize)) {        
+        batchProcessor(batch);
+        currentBatch++;
+
+        if (currentBatch >= batchCount) {
+            return;
+        }
     }
 }
 
@@ -109,5 +136,41 @@ describe('batchAsync', () => {
 
         expect(result.length).toEqual(1);
         expect(result[0]).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('lazily consumes source values', async () => {
+        var producedNumbersCount = 0;
+        async function* trackedNumbers(max: number) {
+            producedNumbersCount = 0;
+            for (let i = 1; i <= max; i++) {
+                producedNumbersCount++;
+                yield i;
+            }
+        }
+
+        var result = [] as number[][];
+
+        const iterator = batchAsync(trackedNumbers(100), 3);
+        expect(producedNumbersCount).toEqual(0);
+        
+        const first = await iterator.next();
+        expect(producedNumbersCount).toEqual(3);
+
+        const second = await iterator.next();
+        expect(producedNumbersCount).toEqual(6);
+    });
+
+    it('cleans resources up quickly', async () => {
+        var result = [] as number[][];
+        var callbackCount = 0;
+        await executeBatchAsyncPartially(sourceFinally(100, () => callbackCount++), 3, (batch) => {
+            result.push(batch)
+        }, 1);
+        expect(callbackCount).toEqual(1);
+
+        await executeBatchAsyncPartially(sourceFinally(100, () => callbackCount++), 3, (batch) => {
+            result.push(batch)
+        }, 2);
+        expect(callbackCount).toEqual(2);
     });
 });
