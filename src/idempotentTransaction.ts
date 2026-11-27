@@ -1,4 +1,4 @@
-import { Client, Pool, PoolClient } from "pg";
+import { Pool } from "pg";
 
 // CREATE TABLE players (
 //     id UUID PRIMARY KEY,
@@ -29,7 +29,8 @@ export async function recordDeath(
     pool: Pool,
     input: DeathRequest
 ): Promise<RecordDeathOutput> {
-    let client: PoolClient = await pool.connect();
+    let client = await pool.connect();
+    let destroyConnection = false;
     try {           
         await client.query('BEGIN');
         const result = await client.query(
@@ -84,11 +85,16 @@ export async function recordDeath(
 
         await client.query('COMMIT');
         return response;
-    } catch (error: any) {
-        console.log(`Record Death error: ${error}`)
-        await client.query('ROLLBACK');
-        return { statusCode: 500};
+    } catch (queryError) {
+        try {
+            console.error('Query failed:', queryError);
+            await client.query('ROLLBACK');
+        } catch (rollbackError) {
+            destroyConnection = true;
+            console.error('Rollback failed:', rollbackError);
+        }
+        throw queryError;
     } finally {
-        await client.release();
+        client.release(destroyConnection);
     }
 }
