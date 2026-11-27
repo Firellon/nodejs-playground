@@ -1,4 +1,4 @@
-import { Client, Pool } from "pg";
+import { Client, Pool, PoolClient } from "pg";
 
 // CREATE TABLE players (
 //     id UUID PRIMARY KEY,
@@ -29,17 +29,8 @@ export async function recordDeath(
     pool: Pool,
     input: DeathRequest
 ): Promise<RecordDeathOutput> {
-    let client: Client = await pool.connect();
-    try {
-        const playerExistsResult = await client.query(
-            `SELECT id from players WHERE id = $1`,
-            [input.playerId]
-        );
-        if (playerExistsResult.rows.length === 0) {
-            // Player does not exist.
-            return { statusCode: 404};
-        }
-            
+    let client: PoolClient = await pool.connect();
+    try {           
         await client.query('BEGIN');
         const result = await client.query(
             `INSERT INTO player_requests (idempotency_key, player_id, session_id, death_cause)
@@ -52,20 +43,20 @@ export async function recordDeath(
         if (result.rows.length === 0) {
             // The event already exists.
             const existingRequest = await client.query(
-                `SELECT death_cause
+                `SELECT death_cause, response
                 FROM player_requests
                 WHERE idempotency_key = $1 AND player_id = $2 AND session_id = $3`,
                 [input.idempotencyKey, input.playerId, input.sessionId]
             );
 
-            if (existingRequest.rows[0].death_cause !== input.deathCause) {
+            if (existingRequest.rows.length === 0 || existingRequest.rows[0].death_cause !== input.deathCause) {
                 // Conflicting data
                 await client.query('ROLLBACK');
                 return { statusCode: 409};
             }
 
             await client.query('COMMIT');
-            return { statusCode: 200 }; // Legitimate retry
+            return existingRequest.rows[0].response; // Legitimate retry
         }
 
         // Newly inserted event
@@ -87,8 +78,7 @@ export async function recordDeath(
         await client.query(
             `UPDATE player_requests
             SET response = $1
-            HERE idempotency_key = $2 AND player_id = $3 AND session_id = $4
-            RETURNING death_count`,
+            WHERE idempotency_key = $2 AND player_id = $3 AND session_id = $4`,
             [response, input.idempotencyKey, input.playerId, input.sessionId]
         );
 
@@ -97,8 +87,8 @@ export async function recordDeath(
     } catch (error: any) {
         console.log(`Record Death error: ${error}`)
         await client.query('ROLLBACK');
-        return { statusCode: 403};
+        return { statusCode: 500};
     } finally {
-        await client.end();
+        await client.release();
     }
 }
